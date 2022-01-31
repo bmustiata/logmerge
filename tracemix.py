@@ -128,7 +128,7 @@ class FileRecord:
 
 
 @click.argument("files_to_mix", nargs=-1)
-@click.option("--output", "-o",
+@click.option("--output", "--out", "-o",
               help="Specify output file",
               default="out.txt")
 @click.option("--window", "-w", is_flag=True, default=False,
