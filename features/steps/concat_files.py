@@ -86,18 +86,27 @@ def check_tracemix_contains_only_sameday_lines(context):
 
 @when("I run tracemix to mix the sources and filter between 23:50 until 00:10")
 def i_run_tracemix_day_passes_over(context):
-    """
-    :type context: behave.runner.Context
-    """
-    raise NotImplementedError(u'STEP: When I run tracemix to mix the sources and filter between 23:50 until 00:10')
+    tracemix.main_no_click(
+        window=False,
+        window_start="23:50",
+        window_end="00:01",
+        output="/tmp/out.txt",
+        files_to_mix=[
+            "features/steps/test_data/file1.txt",
+            "features/steps/test_data/file2.txt",
+            "features/steps/test_data/multiline.txt",
+        ])
+
+    context.output_file = read_file("/tmp/out.txt")
 
 
 @then("the output file contains only the lines from the previous day until today")
 def check_tracemix_contains_only_filtered_days(context):
-    """
-    :type context: behave.runner.Context
-    """
-    raise NotImplementedError(u'STEP: Then the output file contains only the lines from the previous day until today')
+    expected = read_file("features/steps/expected/several_files_day_over_midnight.txt")
+    test.assertEquals(
+        expected, context.output_file,
+        "The concatenated files had wrong content"
+    )
 
 
 @when("I run tracemix to mix the sources and filter using full dates between 23:50 until 00:10")

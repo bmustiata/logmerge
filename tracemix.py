@@ -250,8 +250,14 @@ def read_config_window_time(config: TraceMixConfig, window_start: str, window_en
 
     config.window_end_timestamp = parse_timestamp_value(window_end, now_timestamp)
 
-    if config.window_end_timestamp > now_timestamp and window_end != "now":
+    if config.window_end_timestamp is not None and \
+            config.window_end_timestamp > now_timestamp and \
+            window_end != "now":
         config.window_end_timestamp -= 3600 * 24
+
+    # end window times should finish at the end of the minute
+    if config.window_end_timestamp is not None:
+        config.window_end_timestamp += 60 - 0.001
 
 
 def parse_timestamp_value(window_start: str, now: float) -> Optional[float]:
