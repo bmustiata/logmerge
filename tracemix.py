@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os.path
 
 import click
 import re
@@ -17,7 +18,8 @@ class TraceMixConfig:
 
 class FileTracker:
     def __init__(self, file_name: str) -> None:
-        self.file_name = file_name
+        self.file_name = os.path.basename(file_name)
+        self.full_file_name = file_name
         self._f = FileReader(file_name)
         self._record = self._try_read_record()
 

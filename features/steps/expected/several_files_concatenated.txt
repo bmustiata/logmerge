@@ -1,22 +1,22 @@
-features/steps/test_data/file1.txt 20100128/233741.111 - file1 the system
-features/steps/test_data/file2.txt 20100128/233741.112 - file2 the system
-features/steps/test_data/multiline.txt 20100128/234741.000 - multiline the system
+file1.txt 20100128/233741.111 - file1 the system
+file2.txt 20100128/233741.112 - file2 the system
+multiline.txt 20100128/234741.000 - multiline the system
   is starting
   now
-features/steps/test_data/file1.txt 20220128/234742.222 - file1 is starting
-features/steps/test_data/file2.txt 20220128/234743.222 - file2 is starting
-features/steps/test_data/file1.txt 20220128/235743.444 - file1 up
-features/steps/test_data/file2.txt 20220128/235843.444 - file2 up
-features/steps/test_data/file1.txt 20220129/000101.111 - file1 same milli A
-features/steps/test_data/file1.txt 20220129/000101.111 - file1 same milli B
-features/steps/test_data/file1.txt 20220129/000101.111 - file1 same milli C
-features/steps/test_data/file2.txt 20220129/000101.111 - file2 same milli A
-features/steps/test_data/file2.txt 20220129/000101.111 - file2 same milli B
-features/steps/test_data/file2.txt 20220129/000101.111 - file2 same milli C
-features/steps/test_data/multiline.txt 20220129/000101.111 - multiline same milli A
+file1.txt 20220128/234742.222 - file1 is starting
+file2.txt 20220128/234743.222 - file2 is starting
+file1.txt 20220128/235743.444 - file1 up
+file2.txt 20220128/235843.444 - file2 up
+file1.txt 20220129/000101.111 - file1 same milli A
+file1.txt 20220129/000101.111 - file1 same milli B
+file1.txt 20220129/000101.111 - file1 same milli C
+file2.txt 20220129/000101.111 - file2 same milli A
+file2.txt 20220129/000101.111 - file2 same milli B
+file2.txt 20220129/000101.111 - file2 same milli C
+multiline.txt 20220129/000101.111 - multiline same milli A
     same milli
-features/steps/test_data/multiline.txt 20220129/000101.111 - multiline same milli B
+multiline.txt 20220129/000101.111 - multiline same milli B
     same milli
-features/steps/test_data/file1.txt 20220129/000102.900 - ;
-features/steps/test_data/file2.txt 20220129/000102.900 - ;
-features/steps/test_data/multiline.txt 20220129/000102.900 - ;
+file1.txt 20220129/000102.900 - ;
+file2.txt 20220129/000102.900 - ;
+multiline.txt 20220129/000102.900 - ;
