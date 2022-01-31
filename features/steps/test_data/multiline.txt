@@ -1,0 +1,17 @@
+2022-01-29 00:01:01,200 pool-1-thread-7        [ERROR] AUTOMIC:7777/TESTER_7777/TESTER node0pdhpq0rchpr21mi99upmqdttr1-0 0000000001879066 +22 [com.uc4.ecc.framework.entrypoint.ui.MainUIErrorHandler] - Terminal Error catched by ErrorHandler
+com.uc4.ecc.backends.exceptions.AutomationEngineAPIException: Error during XRequest com.uc4.webui.communication.requests.GetObjectPropertiesAdapter
+	at com.uc4.ecc.backends.util.APICallHelper.sendRequestAndWait(APICallHelper.java:57)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.lambda$sendAndWait$0(RequestService.java:65)
+	at com.uc4.ecc.framework.entrypoint.core.lock.VaadinSessionLockUtil.reportLock(VaadinSessionLockUtil.java:110)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.sendAndWait(RequestService.java:65)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.sendAndWait(RequestService.java:88)
+2022-01-29 00:01:01,200 pool-1-thread-5        [WARN ] AUTOMIC:7777/TESTER_7777/TESTER node0pdhpq0rchpr21mi99upmqdttr1-0 0000000001879066 +11 [com.uc4.ecc.framework.commons.controls.action.ButtonActionController] - Action ProcessAutomationAction ['Add Object'], id:[IText:NEW_OBJECT] matched to button com.uc4.ecc.framework.commons.utils.componentfactories.ExtendedButton@2fc240ec, data:[IText:NEW_OBJECT], id:null using translated caption. this should not happen. check identifiers on these buttons/actions for consistency
+2022-01-29 00:01:01,200 pool-1-thread-6        [WARN ] AUTOMIC:7777/TESTER_7777/TESTER node0pdhpq0rchpr21mi99upmqdttr1-0 0000000001879066 +18 [com.uc4.ecc.framework.commons.controls.action.ButtonActionController] - Action ProcessAutomationAction ['Add Object'], id:[IText:NEW_OBJECT] matched to button com.uc4.ecc.framework.commons.utils.componentfactories.ExtendedButton@2fc240ec, data:[IText:NEW_OBJECT], id:null using translated caption. this should not happen. check identifiers on these buttons/actions for consistency
+2022-01-29 00:01:02,901 pool-1-thread-7        [ERROR] AUTOMIC:7777/TESTER_7777/TESTER node0pdhpq0rchpr21mi99upmqdttr1-0 0000000001879066 +22 [com.uc4.ecc.framework.entrypoint.ui.MainUIErrorHandler] - Terminal Error catched by ErrorHandler
+com.uc4.ecc.backends.exceptions.AutomationEngineAPIException: Error during XRequest com.uc4.webui.communication.requests.GetObjectPropertiesAdapter
+	at com.uc4.ecc.backends.util.APICallHelper.sendRequestAndWait(APICallHelper.java:57)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.lambda$sendAndWait$0(RequestService.java:65)
+	at com.uc4.ecc.framework.entrypoint.core.lock.VaadinSessionLockUtil.reportLock(VaadinSessionLockUtil.java:110)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.sendAndWait(RequestService.java:65)
+	at com.uc4.ecc.backends.impl.dataservice.request.RequestService.sendAndWait(RequestService.java:88)
+2022-01-29 00:01:02,901 qtp686937380-46        [WARN ] AUTOMIC:7777/TESTER_7777/TESTER node0pdhpq0rchpr21mi99upmqdttr1-0 0000000001879066  [com.uc4.ecc.framework.core.text.MLSText] - LEGACY MLSTEXT used: 8051292 = Could not find the object. It may have been deleted or renamed
