@@ -1,5 +1,5 @@
-import subprocess
 import unittest
+import tracemix
 
 from behave import *
 
@@ -19,12 +19,14 @@ def i_have_some_files_with_different_content(context):
 
 @when("I run tracemix to mix the sources")
 def i_run_tracemix_to_mix_the_sources(context):
-    subprocess.check_call([
-        "python", "tracemix.py", "--out", "/tmp/out.txt", 
-        "features/steps/test_data/file1.txt",
-        "features/steps/test_data/file2.txt",
-        "features/steps/test_data/multiline.txt",
-    ])
+    tracemix.main_no_click(
+        window=False,
+        output="/tmp/out.txt",
+        files_to_mix=[
+            "features/steps/test_data/file1.txt",
+            "features/steps/test_data/file2.txt",
+            "features/steps/test_data/multiline.txt",
+        ])
 
     context.output_file = read_file("/tmp/out.txt")
 

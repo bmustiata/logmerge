@@ -47,6 +47,10 @@ class FileTracker:
         if not line:
             return None
 
+        # the readline contains the line endings as well. since we manually add them anyway, we'll drop
+        # them from here.
+        line = line.rstrip()
+
         record = FileRecord(self, line)
 
         self._f.advance()
@@ -68,6 +72,7 @@ class FileTracker:
 
 class FileReader:
     def __init__(self, file_name: str) -> None:
+        # FIXME: make the encoding configurable
         self._f = open(file_name, "rt", encoding="latin9")
         self.current_line = 1
         self._line: Optional[str] = self._f.readline()
@@ -127,6 +132,11 @@ class FileRecord:
         return parsed_time.timestamp()
 
 
+def main_no_click(files_to_mix: List[str], output: str, window: bool) -> None:
+    config = read_config(window)
+    asyncio.run(process_files(config, output, files_to_mix))
+
+
 @click.argument("files_to_mix", nargs=-1)
 @click.option("--output", "--out", "-o",
               help="Specify output file",
@@ -135,8 +145,7 @@ class FileRecord:
               help="Specify an interactive time window to filter the messages")
 @click.command()
 def main(files_to_mix: List[str], output: str, window: bool) -> None:
-    config = read_config(window)
-    asyncio.run(process_files(config, output, files_to_mix))
+    main_no_click(files_to_mix=files_to_mix, output=output, window=window)
 
 
 async def process_files(config: TraceMixConfig, output: str, files_to_mix: List[str]) -> None:
@@ -144,7 +153,7 @@ async def process_files(config: TraceMixConfig, output: str, files_to_mix: List[
 
     with open(output, 'wt', encoding='utf-8') as out:
         print(f"Processing {files_to_mix}")
-        while (next_record := load_next_record(file_trackers)):
+        while next_record := load_next_record(file_trackers):
             if config.window_start_timestamp is not None:
                 if next_record.timestamp < config.window_start_timestamp:
                     continue
