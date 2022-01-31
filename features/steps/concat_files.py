@@ -1,12 +1,26 @@
+import datetime
 import unittest
-import tracemix
 
 from behave import *
+
+import tracemix
 
 use_step_matcher("re")
 
 test = unittest.TestCase()
 test.maxDiff = None
+
+
+class NewDateTime(datetime.datetime):
+    @classmethod
+    def utcnow(cls):
+        return cls(year=2022, month=1, day=29, hour=3, minute=1, tzinfo=None)
+
+    @classmethod
+    def now(cls):
+        return cls(year=2022, month=1, day=29, hour=3, minute=1, tzinfo=None)
+
+datetime.datetime = NewDateTime
 
 
 @given("I have some files with different content")
@@ -21,6 +35,8 @@ def i_have_some_files_with_different_content(context):
 def i_run_tracemix_to_mix_the_sources(context):
     tracemix.main_no_click(
         window=False,
+        window_start="",
+        window_end="",
         output="/tmp/out.txt",
         files_to_mix=[
             "features/steps/test_data/file1.txt",
@@ -45,15 +61,27 @@ def i_run_tracemix_same_day(context):
     """
     :type context: behave.runner.Context
     """
-    raise NotImplementedError(u'STEP: When I run tracemix to mix the sources and filter between 23:40 until 23:50')
+    tracemix.main_no_click(
+        window=False,
+        window_start="23:40",
+        window_end="23:50",
+        output="/tmp/out.txt",
+        files_to_mix=[
+            "features/steps/test_data/file1.txt",
+            "features/steps/test_data/file2.txt",
+            "features/steps/test_data/multiline.txt",
+        ])
+
+    context.output_file = read_file("/tmp/out.txt")
 
 
 @then("the output file contains only the lines between 23:40 until 23:50")
 def check_tracemix_contains_only_sameday_lines(context):
-    """
-    :type context: behave.runner.Context
-    """
-    raise NotImplementedError(u'STEP: Then the output file contains only the lines between 23:40 until 23:50')
+    expected = read_file("features/steps/expected/several_files_same_day.txt")
+    test.assertEquals(
+        expected, context.output_file,
+        "The concatenated files had wrong content"
+    )
 
 
 @when("I run tracemix to mix the sources and filter between 23:50 until 00:10")

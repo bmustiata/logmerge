@@ -1,11 +1,11 @@
 #!/usr/bin/env python
+import asyncio
+import datetime
 import os.path
+import re
+from typing import List, Optional
 
 import click
-import re
-import datetime
-import asyncio
-from typing import List, Optional
 
 FILE_RECORD_RE = re.compile(r'^(\d+/\d+\.\d+)\s|[^\s]+\s+(\d+/\d+\.\d+)\s')
 
@@ -134,8 +134,14 @@ class FileRecord:
         return parsed_time.timestamp()
 
 
-def main_no_click(files_to_mix: List[str], output: str, window: bool) -> None:
-    config = read_config(window)
+def main_no_click(
+        files_to_mix: List[str],
+        output: str,
+        window: bool,
+        window_start: str,
+        window_end: str,
+        ) -> None:
+    config = read_config(window, window_start, window_end)
     asyncio.run(process_files(config, output, files_to_mix))
 
 
@@ -145,9 +151,27 @@ def main_no_click(files_to_mix: List[str], output: str, window: bool) -> None:
               default="out.txt")
 @click.option("--window", "-w", is_flag=True, default=False,
               help="Specify an interactive time window to filter the messages")
+@click.option("--window-start",
+              help="When is the starting time we should start considering log records",
+              default="")
+@click.option("--window-end",
+              help="When is the end time we should start discarding log records",
+              default="")
 @click.command()
-def main(files_to_mix: List[str], output: str, window: bool) -> None:
-    main_no_click(files_to_mix=files_to_mix, output=output, window=window)
+def main(
+        files_to_mix: List[str],
+        output: str,
+        window: bool,
+        window_start: str,
+        window_end: str,
+    ) -> None:
+    main_no_click(
+        files_to_mix=files_to_mix,
+        output=output,
+        window=window,
+        window_start=window_start,
+        window_end=window_end,
+    )
 
 
 async def process_files(config: TraceMixConfig, output: str, files_to_mix: List[str]) -> None:
@@ -199,25 +223,41 @@ def write_statistics(file_trackers: List[FileTracker]) -> None:
         print(f"{file_tracker.file_name} -> {file_tracker.current_line} lines read")
 
 
-def read_config(window: bool) -> TraceMixConfig:
+def read_config(window: bool, window_start: str, window_end: str) -> TraceMixConfig:
     config = TraceMixConfig()
 
-    if window:
-        print("window start time (hh:mm | n/now):")
-        window_start = input()
-        config.window_start_timestamp = parse_timestamp_value(window_start)
-
-    if window:
-        print("window end time (hh:mm / n/now):")
-        window_end = input()
-        config.window_end_timestamp = parse_timestamp_value(window_end)
+    if window or window_start or window_end:
+        read_config_window_time(config, window_start, window_end)
 
     return config
 
 
-def parse_timestamp_value(window_start: str) -> Optional[float]:
+def read_config_window_time(config: TraceMixConfig, window_start: str, window_end: str) ->None:
+    now_timestamp = datetime.datetime.utcnow().timestamp()
+
+    if not window_start:
+        print("window start time (hh:mm | n/now):")
+        window_start = input()
+
+    config.window_start_timestamp = parse_timestamp_value(window_start, now_timestamp)
+
+    if config.window_start_timestamp > now_timestamp and window_start != "now":
+        config.window_start_timestamp -= 3600 * 24
+
+    if not window_end:
+        print("window end time (hh:mm / n/now):")
+        window_end = input()
+
+    config.window_end_timestamp = parse_timestamp_value(window_end, now_timestamp)
+
+    if config.window_end_timestamp > now_timestamp and window_end != "now":
+        config.window_end_timestamp -= 3600 * 24
+
+
+def parse_timestamp_value(window_start: str, now: float) -> Optional[float]:
     if not window_start:
         return None
+
     elif window_start == "now" or window_start == "n":
         return datetime.datetime.utcnow().timestamp()
 
