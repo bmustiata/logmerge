@@ -15,12 +15,12 @@ Scenario: filtering by time should drop lines outside of the time range in the s
 @3
 Scenario: filtering by time should drop lines outside of the time range with date pass
   Given I have some files with different content
-  When I run tracemix to mix the sources and filter between 23:50 until 00:10
+  When I run tracemix to mix the sources and filter between 23:50 until 00:01
   Then the output file contains only the lines from the previous day until today
 
 @4
 Scenario: filtering by date-time should drop lines outside the absolute time range
   Given I have some files with different content
-  When I run tracemix to mix the sources and filter using full dates between 23:50 until 00:10
+  When I run tracemix to mix the sources and filter using full dates between 23:50 until 00:01
   Then the output file contains only the lines from the previous day until today
 

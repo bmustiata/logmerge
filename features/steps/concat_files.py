@@ -84,7 +84,7 @@ def check_tracemix_contains_only_sameday_lines(context):
     )
 
 
-@when("I run tracemix to mix the sources and filter between 23:50 until 00:10")
+@when("I run tracemix to mix the sources and filter between 23:50 until 00:01")
 def i_run_tracemix_day_passes_over(context):
     tracemix.main_no_click(
         window=False,
@@ -109,13 +109,20 @@ def check_tracemix_contains_only_filtered_days(context):
     )
 
 
-@when("I run tracemix to mix the sources and filter using full dates between 23:50 until 00:10")
+@when("I run tracemix to mix the sources and filter using full dates between 23:50 until 00:01")
 def i_runtracemix_with_absolute_dates(context):
-    """
-    :type context: behave.runner.Context
-    """
-    raise NotImplementedError(
-        u'STEP: When I run tracemix to mix the sources and filter using full dates between 23:50 until 00:10')
+    tracemix.main_no_click(
+        window=False,
+        window_start="2022.1.29 23:50",
+        window_end="2022.1.30 00:01",
+        output="/tmp/out.txt",
+        files_to_mix=[
+            "features/steps/test_data/file1.txt",
+            "features/steps/test_data/file2.txt",
+            "features/steps/test_data/multiline.txt",
+        ])
+
+    context.output_file = read_file("/tmp/out.txt")
 
 
 def read_file(file_name: str) -> str:

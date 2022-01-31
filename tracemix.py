@@ -233,13 +233,14 @@ def read_config(window: bool, window_start: str, window_end: str) -> TraceMixCon
 
 
 def read_config_window_time(config: TraceMixConfig, window_start: str, window_end: str) ->None:
-    now_timestamp = datetime.datetime.utcnow().timestamp()
+    utcnow = datetime.datetime.utcnow()
+    now_timestamp = utcnow.timestamp()
 
     if not window_start:
         print("window start time (hh:mm | n/now):")
         window_start = input()
 
-    config.window_start_timestamp = parse_timestamp_value(window_start, now_timestamp)
+    config.window_start_timestamp = parse_timestamp_value(window_start, utcnow)
 
     if config.window_start_timestamp > now_timestamp and window_start != "now":
         config.window_start_timestamp -= 3600 * 24
@@ -248,7 +249,7 @@ def read_config_window_time(config: TraceMixConfig, window_start: str, window_en
         print("window end time (hh:mm / n/now):")
         window_end = input()
 
-    config.window_end_timestamp = parse_timestamp_value(window_end, now_timestamp)
+    config.window_end_timestamp = parse_timestamp_value(window_end, utcnow)
 
     if config.window_end_timestamp is not None and \
             config.window_end_timestamp > now_timestamp and \
@@ -260,17 +261,20 @@ def read_config_window_time(config: TraceMixConfig, window_start: str, window_en
         config.window_end_timestamp += 60 - 0.001
 
 
-def parse_timestamp_value(window_start: str, now: float) -> Optional[float]:
+def parse_timestamp_value(window_start: str, utcnow: datetime.datetime) -> Optional[float]:
     if not window_start:
         return None
 
     elif window_start == "now" or window_start == "n":
         return datetime.datetime.utcnow().timestamp()
 
-    now = datetime.datetime.utcnow()
+    if ' ' in window_start:
+        user_time = datetime.datetime.strptime(window_start, "%Y.%m.%d %H:%M")
+        return user_time.timestamp()
+
     user_time = datetime.datetime.strptime(window_start, "%H:%M")
 
-    return now.replace(hour=user_time.hour, minute=user_time.minute, second=0).timestamp()
+    return utcnow.replace(hour=user_time.hour, minute=user_time.minute, second=0).timestamp()
 
 
 if __name__ == "__main__":
