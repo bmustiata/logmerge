@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 type FileRecord struct {
@@ -97,7 +98,13 @@ func writeLog(outFileName string, input chan FileRecord) {
 }
 
 func ParseTimestamp(line string) (int64, error) {
-	return 0, nil
+	parse, err := time.Parse("20060102/030405.000", line)
+
+	if err != nil {
+		return -1, err
+	}
+
+	return parse.UnixMilli(), nil
 }
 
 func isNewRecord(line string) bool {
