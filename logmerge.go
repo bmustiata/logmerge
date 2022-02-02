@@ -1,16 +1,23 @@
-package logmerge
+package main
 
 import (
 	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"time"
 )
 
 type FileRecord struct {
 	timestamp int64
 	content   string
+}
+
+var FILE_RECORD_RE *regexp.Regexp;
+
+func init() {
+	FILE_RECORD_RE = regexp.MustCompile(`^(\d+/\d+\.\d+)\s`)
 }
 
 // readMultilineLogEntry Reads lines from the log firing multiline records
@@ -46,7 +53,7 @@ func readLogRecord(input chan string, output chan FileRecord) {
 	line, ok := <-input
 
 	for ok {
-		ts, _ := ParseTimestamp(line)
+		ts, _ := parseTimestamp(line)
 		output <- FileRecord{
 			content:   line,
 			timestamp: ts,
@@ -97,8 +104,8 @@ func writeLog(outFileName string, input chan FileRecord) {
 	}
 }
 
-func ParseTimestamp(line string) (int64, error) {
-	parse, err := time.Parse("20060102/030405.000", line)
+func parseTimestamp(line string) (int64, error) {
+	parse, err := time.Parse("20060102/150405.000", line)
 
 	if err != nil {
 		return -1, err
@@ -108,10 +115,9 @@ func ParseTimestamp(line string) (int64, error) {
 }
 
 func isNewRecord(line string) bool {
-	return true
+	return FILE_RECORD_RE.MatchString(line)
 }
 
 func main() {
-
 	fmt.Println("vim-go")
 }
