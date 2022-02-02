@@ -21,6 +21,7 @@ func TestParseTimestamp(t *testing.T) {
 
 func TestIsNewRecord(t *testing.T) {
 	content := "not prefixed by time thing"
+
 	if isNewRecord(content) {
 		t.Logf(
 			"The line:\n%s\nis not prefixed by time. It should indicate a continuation, not a new record.",
@@ -30,6 +31,7 @@ func TestIsNewRecord(t *testing.T) {
 	}
 
 	content = "20220129/000102.900 - ;"
+
 	if ! isNewRecord(content) {
 		t.Logf(
 			"The line:\n%s\nis prefixed by time. It should indicate a new record.",

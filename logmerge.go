@@ -20,6 +20,25 @@ func init() {
 	FILE_RECORD_RE = regexp.MustCompile(`^(\d+/\d+\.\d+)\s`)
 }
 
+func readFileLines(inputFileName string, output chan string) {
+	defer close(output)
+	f, err := os.Open(inputFileName)
+
+	if err!= nil {
+		log.Fatal(fmt.Errorf("unable to open %s: %w", inputFileName, err))
+	}
+
+	s := bufio.NewScanner(f)
+
+	for s.Scan() {
+		output <- s.Text()
+	}
+
+	if s.Err() != nil {
+		log.Fatal(fmt.Errorf("unable to read %s: %w", inputFileName, s.Err()))
+	}
+}
+
 // readMultilineLogEntry Reads lines from the log firing multiline records
 func readMultilineLogEntry(input chan string, output chan string) {
 	defer close(output)
@@ -63,16 +82,25 @@ func readLogRecord(input chan string, output chan FileRecord) {
 	}
 }
 
-func filterLogRecord(input, output chan FileRecord) {
-	defer close(output)
+func filterLogRecord(input chan FileRecord) (chan FileRecord, error) {
 	record, ok := <-input
+	output := make(chan FileRecord)
 
 	// FIXME: when the record exit the window bounds, we should just close the input stream
-	for ok {
-		if isRecordValid(record) {
-			output <- record
+	go func() {
+		for ok {
+			if isRecordValid(record) {
+				output <- record
+			}
+
+			record, ok = <-input
 		}
-	}
+
+		close(output)
+	}()
+
+
+	return output, nil
 }
 
 func isRecordValid(record FileRecord) bool {
@@ -119,5 +147,59 @@ func isNewRecord(line string) bool {
 }
 
 func main() {
-	fmt.Println("vim-go")
+	files := []string { "f1", "f2" }
+	lineChannels, _ := createLineChannels(files)
+	multilineLogEntryChannels, _ := createContentChannels(lineChannels)
+	recordChannels, _ := createRecordChannels(multilineLogEntryChannels)
+	orderedRecordChannel, _ := createOrderByTimeChannel(recordChannels)
+	fiteredResultsChannel, _ := filterLogRecord(orderedRecordChannel)
+	writeLog("/tmp/txt", fiteredResultsChannel)
+}
+
+// createOrderByTimeChannel Reads all the channels and returns the next row in order
+func createOrderByTimeChannel(channels []chan FileRecord) (chan FileRecord, error) {
+	result := make(chan FileRecord)
+
+	// FIXME: implement sorting
+
+	return result, nil
+}
+
+func createLineChannels(files []string) ([]chan string, error) {
+	result := make([]chan string, len(files))
+
+	for i, file := range files {
+		c := make(chan string)
+		go readFileLines(file, c)
+
+		result[i] = c
+	}
+
+	return result, nil
+}
+
+func createContentChannels(lineChannels []chan string) ([]chan string, error) {
+	result := make([]chan string, len(lineChannels))
+
+	for i, lineChannel := range lineChannels {
+		c := make(chan string)
+		go readMultilineLogEntry(lineChannel, c)
+
+		result[i] = c
+	}
+
+	return result, nil
+}
+
+func createRecordChannels(contentChannels []chan string) ([]chan FileRecord, error) {
+	result := make([]chan FileRecord, len(contentChannels))
+
+	for i, file := range contentChannels {
+		c := make(chan FileRecord)
+		go readLogRecord(file, c)
+
+		result[i] = c
+	}
+
+	return result, nil
 }
