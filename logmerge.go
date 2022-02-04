@@ -103,7 +103,7 @@ func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan F
 		})
 	}
 
-	sort.Slice(records, func(i, j int) bool {
+	sort.SliceStable(records, func(i, j int) bool {
 		return records[i].record.timestamp < records[j].record.timestamp
 	})
 
@@ -198,7 +198,7 @@ func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 				content:   line.line,
 			}
 
-			break;
+			break
 		}
 
 		if !ok {
