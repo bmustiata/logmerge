@@ -12,7 +12,7 @@ import (
 
 type FileLine struct {
 	fileName string
-	line     string
+	text     string
 }
 
 type FileRecord struct {
@@ -27,20 +27,28 @@ func init() {
 	FILE_RECORD_RE = regexp.MustCompile(`^(\d+/\d+\.\d+)\s`)
 }
 
+// The processing works the following way:
+//     toRecord            orderByTime             filter             writeLog
+// f1.txt --> chan FileRecord --+--> chan FileRecord --> chan FileRecord --> out.txt
+// f2.txt --> chan FileRecord --+
+// f3.txt --> chan FileRecord --+
+
 func main() {
 	files := []string {
 		"features/steps/test_data/file1.txt",
 		"features/steps/test_data/file2.txt",
 		"features/steps/test_data/multiline.txt",
 	}
-	lineChannels := createLineChannels(files)
-	logEntriesChannels := createLogEntriesChannels(lineChannels)
-	orderedRecordChannel := createOrderByTimeChannel(logEntriesChannels)
-	fiteredResultsChannel := filterLogRecord(orderedRecordChannel)
-	writeLog("/tmp/out.txt", fiteredResultsChannel)
+	lineChannels := toLineChannels(files)
+	logRecordsChannels := toRecords(lineChannels)
+	orderedRecordChannel := orderByTime(logRecordsChannels)
+	filteredRecordChannel := filter(orderedRecordChannel)
+	writeLog("/tmp/out.txt", filteredRecordChannel)
 }
 
-func createLineChannels(files []string) []chan FileLine {
+// Convert the given slice of file names to a slice of channels
+// that yield individual lines.
+func toLineChannels(files []string) []chan FileLine {
 	result := make([]chan FileLine, len(files))
 
 	for i, file := range files {
@@ -53,7 +61,7 @@ func createLineChannels(files []string) []chan FileLine {
 	return result
 }
 
-func createLogEntriesChannels(lineChannels []chan FileLine) []chan FileRecord {
+func toRecords(lineChannels []chan FileLine) []chan FileRecord {
 	result := make([]chan FileRecord, len(lineChannels))
 
 	for i, lineChannel := range lineChannels {
@@ -63,8 +71,8 @@ func createLogEntriesChannels(lineChannels []chan FileLine) []chan FileRecord {
 	return result
 }
 
-// createOrderByTimeChannel Reads all the channels and returns the next row in order
-func createOrderByTimeChannel(channels []chan FileRecord) chan FileRecord {
+// orderByTime Reads all the channels and returns the next row in order
+func orderByTime(channels []chan FileRecord) chan FileRecord {
 	result := make(chan FileRecord)
 
 	go func() {
@@ -86,6 +94,21 @@ func createOrderByTimeChannel(channels []chan FileRecord) chan FileRecord {
 	}()
 
 	return result
+}
+
+func readNextValueOrRemove(
+	channel chan FileRecord,
+	channels map[chan FileRecord]bool,
+	channelLastValue map[chan FileRecord]FileRecord) {
+	value, ok := <- channel
+
+	if ! ok {
+		delete(channels, channel)
+		delete(channelLastValue, channel)
+		return
+	}
+
+	channelLastValue[channel] = value
 }
 
 func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan FileRecord) {
@@ -110,22 +133,8 @@ func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan F
 	return records[0].record, records[0].channel
 }
 
-func readNextValueOrRemove(
-		channel chan FileRecord,
-		channels map[chan FileRecord]bool,
-		channelLastValue map[chan FileRecord]FileRecord) {
-	value, ok := <- channel
-
-	if ! ok {
-		delete(channels, channel)
-		delete(channelLastValue, channel)
-		return
-	}
-
-	channelLastValue[channel] = value
-}
-
-func filterLogRecord(input chan FileRecord) chan FileRecord {
+// filter only the entries that are in the specified time window
+func filter(input chan FileRecord) chan FileRecord {
 	output := make(chan FileRecord)
 
 	// FIXME: when the record exit the window bounds, we should just close the input stream
@@ -159,7 +168,7 @@ func readFileLines(inputFileName string, output chan FileLine) {
 	for s.Scan() {
 		output <- FileLine{
 			fileName: inputFileName,
-			line: s.Text(),
+			text:     s.Text(),
 		}
 	}
 
@@ -169,6 +178,8 @@ func readFileLines(inputFileName string, output chan FileLine) {
 }
 
 // readMultilineLogEntry Reads lines from the log firing multiline records
+// The multiline records will have also the parsed timestamp when they
+// were created.
 func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 	output := make(chan FileRecord)
 
@@ -186,16 +197,16 @@ func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 				break
 			}
 
-			isNewEntry, ts := readNewEntry(line.line)
+			isNewRecord, ts := isLineNewRecord(line.text)
 
-			if !isNewEntry {
+			if !isNewRecord {
 				continue
 			}
 
 			entry = FileRecord{
 				timestamp: ts,
 				fileName:  line.fileName,
-				content:   line.line,
+				content:   line.text,
 			}
 
 			break
@@ -212,10 +223,10 @@ func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 				break
 			}
 
-			isNewEntry, ts := readNewEntry(line.line)
+			isNewRecord, ts := isLineNewRecord(line.text)
 
-			if !isNewEntry {
-				entry.content += "\n" + line.line
+			if !isNewRecord {
+				entry.content += "\n" + line.text
 				continue
 			}
 
@@ -224,7 +235,7 @@ func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 			entry = FileRecord{
 				timestamp: ts,
 				fileName:  line.fileName,
-				content:   line.line,
+				content:   line.text,
 			}
 		}
 
@@ -271,7 +282,7 @@ func writeLog(outFileName string, input chan FileRecord) {
 	f.Close()
 }
 
-func readNewEntry(line string) (bool, int64) {
+func isLineNewRecord(line string) (bool, int64) {
 	m := FILE_RECORD_RE.FindStringSubmatch(line)
 
 	if m == nil {

@@ -22,10 +22,10 @@ func TestParseTimestamp(t *testing.T) {
 func TestIsNewRecord(t *testing.T) {
 	content := "not prefixed by time thing"
 
-	isEntry, timestamp := readNewEntry(content)
+	isEntry, timestamp := isLineNewRecord(content)
 	if isEntry || timestamp > 0 {
 		t.Logf(
-			"The line:\n%s\nis not prefixed by time. It should indicate a continuation, not a new record.",
+			"The text:\n%s\nis not prefixed by time. It should indicate a continuation, not a new record.",
 			content,
 		)
 		t.Fail()
@@ -33,10 +33,10 @@ func TestIsNewRecord(t *testing.T) {
 
 	content = "20220129/000102.900 - ;"
 
-	isEntry, timestamp = readNewEntry(content)
+	isEntry, timestamp = isLineNewRecord(content)
 	if !isEntry || timestamp < 0 {
 		t.Logf(
-			"The line:\n%s\nis prefixed by time. It should indicate a new record.",
+			"The text:\n%s\nis prefixed by time. It should indicate a new record.",
 			content,
 		)
 		t.Fail()
@@ -52,7 +52,7 @@ func TestMultilineEntryReading(t *testing.T) {
 
 	// we keep the channel sized 100 to catch bugs when the multiline isn't
 	// yielding multilines, but single lines. Otherwise, it would just lock,
-	// since we read the first line in the for, the readMultilineLogEntry
+	// since we read the first text in the for, the readMultilineLogEntry
 	// writes one on its outChan, but since we're not yet reading, it will
 	// die.
 	lineChan := make(chan FileLine)
@@ -63,7 +63,7 @@ func TestMultilineEntryReading(t *testing.T) {
 		for _, line := range content {
 			lineChan <- FileLine{
 				fileName: "a.txt",
-				line: line,
+				text:     line,
 			}
 		}
 
