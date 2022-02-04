@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -21,10 +23,25 @@ type FileRecord struct {
 	content   string
 }
 
+type FilterTimeWindow struct {
+	startTimestamp *int64
+	endTimestamp *int64
+}
+
+type AppConfig struct {
+	window FilterTimeWindow
+	filesToMix     []string
+	outputFileName string
+}
+
 var FILE_RECORD_RE *regexp.Regexp;
+var STDIN_READER *bufio.Reader
 
 func init() {
 	FILE_RECORD_RE = regexp.MustCompile(`^(\d+/\d+\.\d+)\s`)
+
+	// we need to reuse the reader, since it's buffered
+	STDIN_READER = bufio.NewReader(os.Stdin)
 }
 
 // The processing works the following way:
@@ -34,16 +51,117 @@ func init() {
 // f3.txt --> chan FileRecord --+
 
 func main() {
-	files := []string {
-		"features/steps/test_data/file1.txt",
-		"features/steps/test_data/file2.txt",
-		"features/steps/test_data/multiline.txt",
-	}
-	lineChannels := toLineChannels(files)
+	config := readApplicationConfig()
+
+	lineChannels := toLineChannels(config.filesToMix)
 	logRecordsChannels := toRecords(lineChannels)
 	orderedRecordChannel := orderByTime(logRecordsChannels)
-	filteredRecordChannel := filter(orderedRecordChannel)
-	writeLog("/tmp/out.txt", filteredRecordChannel)
+	filteredRecordChannel := filter(config, orderedRecordChannel)
+
+	writeLog(config.outputFileName, filteredRecordChannel)
+}
+
+func readApplicationConfig() AppConfig {
+	var isWindow bool
+	var windowStartTimeString, windowEndTimeString, outputFileName string
+
+	flag.BoolVar(&isWindow, "w", false, "Use a time window to filter records")
+	flag.StringVar(&windowStartTimeString, "window-start", "", "Start time to filter log entries")
+	flag.StringVar(&windowEndTimeString, "window-end", "", "End time to filter log entries")
+	flag.StringVar(&outputFileName, "output", "", "The output file to write");
+
+	flag.Parse()
+
+	result := AppConfig{
+		filesToMix:     flag.Args(),
+		outputFileName: outputFileName,
+	}
+
+	if isWindow || windowStartTimeString != "" || windowEndTimeString != "" {
+		result.window = createTimeWindowFilter(windowStartTimeString, windowEndTimeString)
+	}
+
+	return result
+}
+
+func createTimeWindowFilter(windowStart string, windowEnd string) FilterTimeWindow {
+	window := FilterTimeWindow{}
+	utcnow := time.Now().UnixMilli()
+
+	if windowStart == "" {
+		windowStart = readFromUser("window start time (yyyy.MM.dd hh:mm  /  hh:mm  /  n/now):")
+	}
+
+	window.startTimestamp = parseTimestampValue(windowStart, utcnow)
+
+	if window.startTimestamp != nil &&
+			*window.startTimestamp > utcnow &&
+			windowStart != "now" {
+		*window.startTimestamp -= 3600 * 24
+	}
+
+	if windowEnd == "" {
+		windowEnd = readFromUser("window end time (yyyy.MM.dd hh:mm  /  hh:mm  /  n/now):")
+	}
+
+	window.endTimestamp = parseTimestampValue(windowEnd, utcnow)
+
+	if window.endTimestamp != nil &&
+			*window.endTimestamp > utcnow &&
+			windowEnd != "now" {
+		*window.endTimestamp -= 3600 * 24
+	}
+
+	// end window times should finish at the end of the minute
+	if window.endTimestamp != nil {
+		*window.endTimestamp += 60000 - 1
+	}
+
+	return window
+}
+
+func parseTimestampValue(timeString string, utcnow int64) *int64 {
+	if timeString == "" {
+		return nil
+	}
+
+	if timeString == "now" || timeString == "n" {
+		return &utcnow
+	}
+
+
+	if strings.ContainsRune(timeString, ' ') {
+		result := MustParseTime(timeString, "2006.01.02 15:04")
+		return &result
+	}
+
+	result := MustParseTime(timeString, "15:04")
+
+	var dayInfo int64 = 1000 * 3600 * 24
+	result = utcnow - utcnow % dayInfo + result % dayInfo
+
+	return &result
+}
+
+func MustParseTime(timeString, format string) int64 {
+	t, err := time.Parse(format, timeString)
+
+	if err != nil {
+		log.Fatal(fmt.Errorf("unable to parse %s with format %s: %w",
+			timeString,
+			format,
+			err,
+		))
+	}
+
+	return t.UnixMilli()
+}
+
+func readFromUser(label string) string {
+	fmt.Fprint(os.Stderr, label+" ")
+	s, _ := STDIN_READER.ReadString('\n')
+
+	return strings.TrimSpace(s)
 }
 
 // Convert the given slice of file names to a slice of channels
@@ -134,22 +252,22 @@ func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan F
 }
 
 // filter only the entries that are in the specified time window
-func filter(input chan FileRecord) chan FileRecord {
+func filter(config AppConfig, input chan FileRecord) chan FileRecord {
 	output := make(chan FileRecord)
 
 	// FIXME: when the record exit the window bounds, we should just close the input stream
 	go func() {
+		defer close(output)
+
 		record, ok := <-input
 
 		for ok {
-			if isRecordValid(record) {
+			if isRecordValid(config, record) {
 				output <- record
 			}
 
 			record, ok = <-input
 		}
-
-		defer close(output)
 	}()
 
 	return output
@@ -246,8 +364,15 @@ func readMultilineLogEntry(input chan FileLine) chan FileRecord {
 	return output
 }
 
-func isRecordValid(record FileRecord) bool {
-	// FIXME: implement
+func isRecordValid(config AppConfig, record FileRecord) bool {
+	if config.window.startTimestamp != nil && record.timestamp < *config.window.startTimestamp {
+		return false
+	}
+
+	if config.window.endTimestamp != nil && record.timestamp > *config.window.endTimestamp {
+		return false
+	}
+
 	return true
 }
 
@@ -256,7 +381,7 @@ func writeLog(outFileName string, input chan FileRecord) {
 	f, err := os.Create(outFileName)
 
 	if err != nil {
-		log.Fatal(fmt.Errorf("unable to create output file %s: %w", outFileName, err))
+		log.Fatal(fmt.Errorf("unable to create outputFileName file %s: %w", outFileName, err))
 	}
 
 	r := bufio.NewWriter(f)
@@ -267,7 +392,7 @@ func writeLog(outFileName string, input chan FileRecord) {
 		_, err = r.WriteString(record.content + "\n")
 
 		if err != nil {
-			log.Fatal(fmt.Errorf("unable to write into output file %s: %w", outFileName, err))
+			log.Fatal(fmt.Errorf("unable to write into outputFileName file %s: %w", outFileName, err))
 		}
 
 		record, ok = <-input
@@ -276,7 +401,7 @@ func writeLog(outFileName string, input chan FileRecord) {
 	err = r.Flush()
 
 	if err != nil {
-		log.Fatal(fmt.Errorf("unable to flush output %s: %w", outFileName, err))
+		log.Fatal(fmt.Errorf("unable to flush outputFileName %s: %w", outFileName, err))
 	}
 
 	f.Close()

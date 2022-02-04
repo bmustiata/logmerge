@@ -70,7 +70,7 @@ func TestMultilineEntryReading(t *testing.T) {
 		close(lineChan)
 	}()
 
-	// FIXME: in real life this might leak coroutines, since the output chan isn't read
+	// FIXME: in real life this might leak coroutines, since the outputFileName chan isn't read
 	//        anymore.
 	outEntry := <- outChan
 
