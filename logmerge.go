@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -198,14 +199,16 @@ func orderByTime(channels []chan FileRecord) chan FileRecord {
 
 		activeChannels := make(map[chan FileRecord]bool)
 		activeChannelsLastValues := make(map[chan FileRecord]FileRecord)
+		channelIndex := make(map[chan FileRecord]int)
 
-		for _, channel := range channels {
+		for index, channel := range channels {
+			channelIndex[channel] = index
 			activeChannels[channel] = true
 			readNextValueOrRemove(channel, activeChannels, activeChannelsLastValues)
 		}
 
 		for len(activeChannels) > 0 {
-			newestRecord, channel := findNewestRecord(activeChannelsLastValues)
+			newestRecord, channel := findNewestRecord(activeChannelsLastValues, channelIndex)
 			result <- newestRecord
 			readNextValueOrRemove(channel, activeChannels, activeChannelsLastValues)
 		}
@@ -229,7 +232,8 @@ func readNextValueOrRemove(
 	channelLastValue[channel] = value
 }
 
-func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan FileRecord) {
+func findNewestRecord(values map[chan FileRecord]FileRecord,
+					  channelIndex map[chan FileRecord]int) (FileRecord, chan FileRecord) {
 	type Pair struct {
 		channel chan FileRecord
 		record FileRecord
@@ -245,6 +249,12 @@ func findNewestRecord(values map[chan FileRecord]FileRecord) (FileRecord, chan F
 	}
 
 	sort.SliceStable(records, func(i, j int) bool {
+		// When multiple lines are matching at the same millisecond, we need to ensure
+		// we cluster them by the files order we received.
+		if records[i].record.timestamp == records[j].record.timestamp {
+			return channelIndex[records[i].channel] < channelIndex[records[j].channel]
+		}
+
 		return records[i].record.timestamp < records[j].record.timestamp
 	})
 
@@ -389,7 +399,8 @@ func writeLog(outFileName string, input chan FileRecord) {
 	record, ok := <-input
 
 	for ok {
-		_, err = r.WriteString(record.content + "\n")
+		basePath := path.Base(record.fileName)
+		_, err = r.WriteString(basePath + " " + record.content + "\n")
 
 		if err != nil {
 			log.Fatal(fmt.Errorf("unable to write into outputFileName file %s: %w", outFileName, err))
