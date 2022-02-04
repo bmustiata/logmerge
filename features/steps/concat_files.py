@@ -34,20 +34,9 @@ def i_have_some_files_with_different_content(context):
 
 @when("I run logmerge to mix the sources")
 def i_run_tracemix_to_mix_the_sources(context):
-    # logmerge.main_no_click(
-    #     window=False,
-    #     window_start="",
-    #     window_end="",
-    #     output="/tmp/out.txt",
-    #     files_to_mix=[
-    #         "features/steps/test_data/file1.txt",
-    #         "features/steps/test_data/file2.txt",
-    #         "features/steps/test_data/multiline.txt",
-    #     ])
-
     subprocess.check_call([
         "/bin/bash", "-c", """
-        ./logmerge -output /tmp/out.txt \\
+        go run ./logmerge.go -output /tmp/out.txt \\
             -test-only-current-time='2022.01.29 03:01' \\
             features/steps/test_data/file1.txt \\
             features/steps/test_data/file2.txt \\
@@ -69,23 +58,9 @@ def the_output_file_contains_all_files_concatenated(context):
 
 @when("I run logmerge to mix the sources and filter between 23:40 until 23:50")
 def i_run_tracemix_same_day(context):
-    """
-    :type context: behave.runner.Context
-    """
-    # logmerge.main_no_click(
-    #     window=False,
-    #     window_start="23:40",
-    #     window_end="23:50",
-    #     output="/tmp/out.txt",
-    #     files_to_mix=[
-    #         "features/steps/test_data/file1.txt",
-    #         "features/steps/test_data/file2.txt",
-    #         "features/steps/test_data/multiline.txt",
-    #     ])
-
     subprocess.check_call([
         "/bin/bash", "-c", """
-        ./logmerge -output /tmp/out.txt \\
+        go run ./logmerge.go -output /tmp/out.txt \\
             -window-start='23:40' \\
             -window-end='23:50' \\
             -test-only-current-time='2022.01.29 03:01' \\
@@ -109,20 +84,9 @@ def check_tracemix_contains_only_sameday_lines(context):
 
 @when("I run logmerge to mix the sources and filter between 23:50 until 00:01")
 def i_run_tracemix_day_passes_over(context):
-    # logmerge.main_no_click(
-    #     window=False,
-    #     window_start="23:50",
-    #     window_end="00:01",
-    #     output="/tmp/out.txt",
-    #     files_to_mix=[
-    #         "features/steps/test_data/file1.txt",
-    #         "features/steps/test_data/file2.txt",
-    #         "features/steps/test_data/multiline.txt",
-    #     ])
-
     subprocess.check_call([
         "/bin/bash", "-c", """
-        ./logmerge -output /tmp/out.txt \\
+        go run ./logmerge.go -output /tmp/out.txt \\
             -window-start='23:50' \\
             -window-end='00:01' \\
             -test-only-current-time='2022.01.29 03:01' \\
@@ -146,22 +110,12 @@ def check_tracemix_contains_only_filtered_days(context):
 
 @when("I run logmerge to mix the sources and filter using full dates between 23:50 until 00:01")
 def i_runtracemix_with_absolute_dates(context):
-    # logmerge.main_no_click(
-    #     window=False,
-    #     window_start="2022.1.29 23:50",
-    #     window_end="2022.1.30 00:01",
-    #     output="/tmp/out.txt",
-    #     files_to_mix=[
-    #         "features/steps/test_data/file1.txt",
-    #         "features/steps/test_data/file2.txt",
-    #         "features/steps/test_data/multiline.txt",
-    #     ])
-
     subprocess.check_call([
         "/bin/bash", "-c", """
-        ./logmerge -output /tmp/out.txt \\
+        go run ./logmerge.go -output /tmp/out.txt \\
             -window-start='2022.01.28 23:50' \\
             -window-end='2022.01.29 00:01' \\
+            -test-only-current-time='2022.01.29 03:01' \\
             features/steps/test_data/file1.txt \\
             features/steps/test_data/file2.txt \\
             features/steps/test_data/multiline.txt

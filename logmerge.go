@@ -38,6 +38,7 @@ type AppConfig struct {
 	window FilterTimeWindow
 	filesToMix     []string
 	outputFileName string
+	channelSize int
 }
 
 var FILE_RECORD_RE *regexp.Regexp;
@@ -59,9 +60,9 @@ func init() {
 func main() {
 	config := readApplicationConfig()
 
-	lineChannels := toLineChannels(config.filesToMix)
-	logRecordsChannels := toRecords(lineChannels)
-	orderedRecordChannel := orderByTime(logRecordsChannels)
+	lineChannels := toLineChannels(config, config.filesToMix)
+	logRecordsChannels := toRecords(config, lineChannels)
+	orderedRecordChannel := orderByTime(config, logRecordsChannels)
 	filteredRecordChannel := filter(config, orderedRecordChannel)
 
 	writeLog(config.outputFileName, filteredRecordChannel)
@@ -71,18 +72,21 @@ func readApplicationConfig() AppConfig {
 	var isWindow bool
 	var windowStartTimeString, windowEndTimeString, outputFileName string
 	var testOnlyCurrentTime string
+	var channelSize int
 
 	flag.BoolVar(&isWindow, "w", false, "Use a time window to filter records")
 	flag.StringVar(&windowStartTimeString, "window-start", "", "Start time to filter log entries")
 	flag.StringVar(&windowEndTimeString, "window-end", "", "End time to filter log entries")
 	flag.StringVar(&outputFileName, "output", "", "The output file to write")
 	flag.StringVar(&testOnlyCurrentTime, "test-only-current-time", "", "DO NOT USE")
+	flag.IntVar(&channelSize, "channel-size", 10, "How big to make the channels (buffering)")
 
 	flag.Parse()
 
 	result := AppConfig{
 		filesToMix:     flag.Args(),
 		outputFileName: outputFileName,
+		channelSize: channelSize,
 	}
 
 	if testOnlyCurrentTime != "" {
@@ -187,11 +191,11 @@ func readFromUser(label string) string {
 
 // Convert the given slice of file names to a slice of channels
 // that yield individual lines.
-func toLineChannels(files []string) []chan FileLine {
+func toLineChannels(config AppConfig, files []string) []chan FileLine {
 	result := make([]chan FileLine, len(files))
 
 	for i, file := range files {
-		c := make(chan FileLine)
+		c := make(chan FileLine, config.channelSize)
 		go readFileLines(file, c)
 
 		result[i] = c
@@ -200,19 +204,19 @@ func toLineChannels(files []string) []chan FileLine {
 	return result
 }
 
-func toRecords(lineChannels []chan FileLine) []chan FileRecord {
+func toRecords(config AppConfig, lineChannels []chan FileLine) []chan FileRecord {
 	result := make([]chan FileRecord, len(lineChannels))
 
 	for i, lineChannel := range lineChannels {
-		result[i] = readMultilineLogEntry(lineChannel)
+		result[i] = readMultilineLogEntry(config, lineChannel)
 	}
 
 	return result
 }
 
 // orderByTime Reads all the channels and returns the next row in order
-func orderByTime(channels []chan FileRecord) chan FileRecord {
-	result := make(chan FileRecord)
+func orderByTime(config AppConfig, channels []chan FileRecord) chan FileRecord {
+	result := make(chan FileRecord, config.channelSize)
 
 	go func() {
 		defer close(result)
@@ -283,7 +287,7 @@ func findNewestRecord(values map[chan FileRecord]FileRecord,
 
 // filter only the entries that are in the specified time window
 func filter(config AppConfig, input chan FileRecord) chan FileRecord {
-	output := make(chan FileRecord)
+	output := make(chan FileRecord, config.channelSize)
 
 	// FIXME: when the record exit the window bounds, we should just close the input stream
 	go func() {
@@ -328,8 +332,8 @@ func readFileLines(inputFileName string, output chan FileLine) {
 // readMultilineLogEntry Reads lines from the log firing multiline records
 // The multiline records will have also the parsed timestamp when they
 // were created.
-func readMultilineLogEntry(input chan FileLine) chan FileRecord {
-	output := make(chan FileRecord)
+func readMultilineLogEntry(config AppConfig, input chan FileLine) chan FileRecord {
+	output := make(chan FileRecord, config.channelSize)
 
 	go func() {
 		defer close(output)
