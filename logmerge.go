@@ -29,7 +29,12 @@ type FilterTimeWindow struct {
 	endTimestamp *int64
 }
 
+type TestOnlyFlags struct {
+	currentTime *int64
+}
+
 type AppConfig struct {
+	testOnly TestOnlyFlags
 	window FilterTimeWindow
 	filesToMix     []string
 	outputFileName string
@@ -65,11 +70,13 @@ func main() {
 func readApplicationConfig() AppConfig {
 	var isWindow bool
 	var windowStartTimeString, windowEndTimeString, outputFileName string
+	var testOnlyCurrentTime string
 
 	flag.BoolVar(&isWindow, "w", false, "Use a time window to filter records")
 	flag.StringVar(&windowStartTimeString, "window-start", "", "Start time to filter log entries")
 	flag.StringVar(&windowEndTimeString, "window-end", "", "End time to filter log entries")
-	flag.StringVar(&outputFileName, "output", "", "The output file to write");
+	flag.StringVar(&outputFileName, "output", "", "The output file to write")
+	flag.StringVar(&testOnlyCurrentTime, "test-only-current-time", "", "DO NOT USE")
 
 	flag.Parse()
 
@@ -78,16 +85,21 @@ func readApplicationConfig() AppConfig {
 		outputFileName: outputFileName,
 	}
 
+	if testOnlyCurrentTime != "" {
+		fakeCurrentTime := MustParseTime(testOnlyCurrentTime, "2006.01.02 15:04")
+		result.testOnly.currentTime = &fakeCurrentTime
+	}
+
 	if isWindow || windowStartTimeString != "" || windowEndTimeString != "" {
-		result.window = createTimeWindowFilter(windowStartTimeString, windowEndTimeString)
+		result.window = createTimeWindowFilter(result, windowStartTimeString, windowEndTimeString)
 	}
 
 	return result
 }
 
-func createTimeWindowFilter(windowStart string, windowEnd string) FilterTimeWindow {
+func createTimeWindowFilter(config AppConfig, windowStart string, windowEnd string) FilterTimeWindow {
 	window := FilterTimeWindow{}
-	utcnow := time.Now().UnixMilli()
+	utcnow := GetCurrentTime(config)
 
 	if windowStart == "" {
 		windowStart = readFromUser("window start time (yyyy.MM.dd hh:mm  /  hh:mm  /  n/now):")
@@ -119,6 +131,14 @@ func createTimeWindowFilter(windowStart string, windowEnd string) FilterTimeWind
 	}
 
 	return window
+}
+
+func GetCurrentTime(config AppConfig) int64 {
+	if config.testOnly.currentTime != nil {
+		return *config.testOnly.currentTime
+	}
+
+	return time.Now().UnixMilli()
 }
 
 func parseTimestampValue(timeString string, utcnow int64) *int64 {

@@ -48,6 +48,7 @@ def i_run_tracemix_to_mix_the_sources(context):
     subprocess.check_call([
         "/bin/bash", "-c", """
         ./logmerge -output /tmp/out.txt \\
+            -test-only-current-time='2022.01.29 03:01' \\
             features/steps/test_data/file1.txt \\
             features/steps/test_data/file2.txt \\
             features/steps/test_data/multiline.txt
@@ -85,8 +86,9 @@ def i_run_tracemix_same_day(context):
     subprocess.check_call([
         "/bin/bash", "-c", """
         ./logmerge -output /tmp/out.txt \\
-            -window-start='23:40'
-            -window-end='23:50'
+            -window-start='23:40' \\
+            -window-end='23:50' \\
+            -test-only-current-time='2022.01.29 03:01' \\
             features/steps/test_data/file1.txt \\
             features/steps/test_data/file2.txt \\
             features/steps/test_data/multiline.txt
@@ -107,16 +109,28 @@ def check_tracemix_contains_only_sameday_lines(context):
 
 @when("I run logmerge to mix the sources and filter between 23:50 until 00:01")
 def i_run_tracemix_day_passes_over(context):
-    logmerge.main_no_click(
-        window=False,
-        window_start="23:50",
-        window_end="00:01",
-        output="/tmp/out.txt",
-        files_to_mix=[
-            "features/steps/test_data/file1.txt",
-            "features/steps/test_data/file2.txt",
-            "features/steps/test_data/multiline.txt",
-        ])
+    # logmerge.main_no_click(
+    #     window=False,
+    #     window_start="23:50",
+    #     window_end="00:01",
+    #     output="/tmp/out.txt",
+    #     files_to_mix=[
+    #         "features/steps/test_data/file1.txt",
+    #         "features/steps/test_data/file2.txt",
+    #         "features/steps/test_data/multiline.txt",
+    #     ])
+
+    subprocess.check_call([
+        "/bin/bash", "-c", """
+        ./logmerge -output /tmp/out.txt \\
+            -window-start='23:50' \\
+            -window-end='00:01' \\
+            -test-only-current-time='2022.01.29 03:01' \\
+            features/steps/test_data/file1.txt \\
+            features/steps/test_data/file2.txt \\
+            features/steps/test_data/multiline.txt
+        """
+    ])
 
     context.output_file = read_file("/tmp/out.txt")
 
