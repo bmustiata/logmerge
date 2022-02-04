@@ -10,8 +10,14 @@ import (
 	"time"
 )
 
+type FileLine struct {
+	fileName string
+	line     string
+}
+
 type FileRecord struct {
 	timestamp int64
+	fileName  string
 	content   string
 }
 
@@ -28,18 +34,17 @@ func main() {
 		"features/steps/test_data/multiline.txt",
 	}
 	lineChannels := createLineChannels(files)
-	multilineLogEntryChannels := createContentChannels(lineChannels)
-	recordChannels := createRecordChannels(multilineLogEntryChannels)
-	orderedRecordChannel := createOrderByTimeChannel(recordChannels)
+	logEntriesChannels := createLogEntriesChannels(lineChannels)
+	orderedRecordChannel := createOrderByTimeChannel(logEntriesChannels)
 	fiteredResultsChannel := filterLogRecord(orderedRecordChannel)
 	writeLog("/tmp/out.txt", fiteredResultsChannel)
 }
 
-func createLineChannels(files []string) []chan string {
-	result := make([]chan string, len(files))
+func createLineChannels(files []string) []chan FileLine {
+	result := make([]chan FileLine, len(files))
 
 	for i, file := range files {
-		c := make(chan string)
+		c := make(chan FileLine)
 		go readFileLines(file, c)
 
 		result[i] = c
@@ -48,27 +53,11 @@ func createLineChannels(files []string) []chan string {
 	return result
 }
 
-func createContentChannels(lineChannels []chan string) []chan string {
-	result := make([]chan string, len(lineChannels))
+func createLogEntriesChannels(lineChannels []chan FileLine) []chan FileRecord {
+	result := make([]chan FileRecord, len(lineChannels))
 
 	for i, lineChannel := range lineChannels {
-		c := make(chan string)
-		go readMultilineLogEntry(lineChannel, c)
-
-		result[i] = c
-	}
-
-	return result
-}
-
-func createRecordChannels(contentChannels []chan string) []chan FileRecord {
-	result := make([]chan FileRecord, len(contentChannels))
-
-	for i, file := range contentChannels {
-		c := make(chan FileRecord)
-		go convertLogEntryToRecord(file, c)
-
-		result[i] = c
+		result[i] = readMultilineLogEntry(lineChannel)
 	}
 
 	return result
@@ -157,7 +146,7 @@ func filterLogRecord(input chan FileRecord) chan FileRecord {
 	return output
 }
 
-func readFileLines(inputFileName string, output chan string) {
+func readFileLines(inputFileName string, output chan FileLine) {
 	defer close(output)
 	f, err := os.Open(inputFileName)
 
@@ -168,7 +157,10 @@ func readFileLines(inputFileName string, output chan string) {
 	s := bufio.NewScanner(f)
 
 	for s.Scan() {
-		output <- s.Text()
+		output <- FileLine{
+			fileName: inputFileName,
+			line: s.Text(),
+		}
 	}
 
 	if s.Err() != nil {
@@ -177,46 +169,70 @@ func readFileLines(inputFileName string, output chan string) {
 }
 
 // readMultilineLogEntry Reads lines from the log firing multiline records
-func readMultilineLogEntry(input chan string, output chan string) {
-	defer close(output)
+func readMultilineLogEntry(input chan FileLine) chan FileRecord {
+	output := make(chan FileRecord)
 
-	var content, line string
-	content, ok := <-input
+	go func() {
+		defer close(output)
 
-	if !ok {
-		return
-	}
+		var entry FileRecord
+		var line FileLine
+		var ok bool
 
-	for {
-		line, ok = <-input
+		for {
+			line, ok = <-input
+
+			if ! ok {
+				break
+			}
+
+			isNewEntry, ts := readNewEntry(line.line)
+
+			if !isNewEntry {
+				continue
+			}
+
+			entry = FileRecord{
+				timestamp: ts,
+				fileName:  line.fileName,
+				content:   line.line,
+			}
+
+			break;
+		}
 
 		if !ok {
-			break
+			return
 		}
 
-		if !isNewRecord(line) {
-			content += line
+		for {
+			line, ok = <-input
+
+			if !ok {
+				break
+			}
+
+			isNewEntry, ts := readNewEntry(line.line)
+
+			if !isNewEntry {
+				entry.content += "\n" + line.line
+				continue
+			}
+
+			output <- entry
+
+			entry = FileRecord{
+				timestamp: ts,
+				fileName:  line.fileName,
+				content:   line.line,
+			}
 		}
 
-		output <- content
-		content = line
-	}
-}
+		// write the last entry
+		output <- entry
+	}()
 
-func convertLogEntryToRecord(input chan string, output chan FileRecord) {
-	defer close(output)
-
-	line, ok := <-input
-
-	for ok {
-		ts, _ := parseTimestamp(line)
-		output <- FileRecord{
-			content:   line,
-			timestamp: ts,
-		}
-
-		line, ok = <-input
-	}
+	return output
 }
 
 func isRecordValid(record FileRecord) bool {
@@ -255,16 +271,28 @@ func writeLog(outFileName string, input chan FileRecord) {
 	f.Close()
 }
 
-func parseTimestamp(line string) (int64, error) {
-	parse, err := time.Parse("20060102/150405.000", line)
+func readNewEntry(line string) (bool, int64) {
+	m := FILE_RECORD_RE.FindStringSubmatch(line)
+
+	if m == nil {
+		return false, -1
+	}
+
+	timestamp, err := parseTimestamp(m[1])
+
+	if err != nil {
+		return false, -2
+	}
+
+	return true, timestamp
+}
+
+func parseTimestamp(stringTimestamp string) (int64, error) {
+	parse, err := time.Parse("20060102/150405.000", stringTimestamp)
 
 	if err != nil {
 		return -1, err
 	}
 
 	return parse.UnixMilli(), nil
-}
-
-func isNewRecord(line string) bool {
-	return FILE_RECORD_RE.MatchString(line)
 }
