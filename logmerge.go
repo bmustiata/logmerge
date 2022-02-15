@@ -44,6 +44,8 @@ type AppConfig struct {
 var FILE_RECORD_RE *regexp.Regexp;
 var STDIN_READER *bufio.Reader
 
+const ONE_DAY_MILLIS = 3600 * 24 * 1000
+
 func init() {
 	FILE_RECORD_RE = regexp.MustCompile(`^(\d+/\d+\.\d+)\s`)
 
@@ -126,12 +128,20 @@ func createTimeWindowFilter(config AppConfig, windowStart string, windowEnd stri
 	if window.endTimestamp != nil &&
 			*window.endTimestamp > utcnow &&
 			windowEnd != "now" {
-		*window.endTimestamp -= 3600 * 24
+		*window.endTimestamp -= ONE_DAY_MILLIS
 	}
 
 	// end window times should finish at the end of the minute
 	if window.endTimestamp != nil {
 		*window.endTimestamp += 60000 - 1
+	}
+
+	// End window times should be after the start times. This can happen if the
+	// user entered local times and the day changed:
+	// startTimestamp: 23:50, endTimestamp: 01:30
+	if window.endTimestamp != nil && window.startTimestamp != nil &&
+		*window.endTimestamp < *window.startTimestamp {
+		*window.endTimestamp += ONE_DAY_MILLIS
 	}
 
 	return window
