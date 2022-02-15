@@ -81,7 +81,7 @@ func readApplicationConfig() AppConfig {
 	flag.StringVar(&windowEndTimeString, "window-end", "", "End time to filter log entries")
 	flag.StringVar(&outputFileName, "output", "", "The output file to write")
 	flag.StringVar(&testOnlyCurrentTime, "test-only-current-time", "", "DO NOT USE")
-	flag.IntVar(&channelSize, "channel-size", 10, "How big to make the channels (buffering)")
+	flag.IntVar(&channelSize, "channel-size", 10000, "How big to make the channels (buffering)")
 
 	flag.Parse()
 
@@ -92,7 +92,7 @@ func readApplicationConfig() AppConfig {
 	}
 
 	if testOnlyCurrentTime != "" {
-		fakeCurrentTime := MustParseTime(testOnlyCurrentTime, "2006.01.02 15:04")
+		fakeCurrentTime := MustParseTime(0, testOnlyCurrentTime)
 		result.testOnly.currentTime = &fakeCurrentTime
 	}
 
@@ -108,7 +108,7 @@ func createTimeWindowFilter(config AppConfig, windowStart string, windowEnd stri
 	utcnow := GetCurrentTime(config)
 
 	if windowStart == "" {
-		windowStart = readFromUser("window start time (yyyy.MM.dd hh:mm  /  hh:mm  /  n/now):")
+		windowStart = readFromUser("window start time: yyyy.MM.dd hh:mm(:ss) | hh:mm(:ss) | n/now>")
 	}
 
 	window.startTimestamp = parseTimestampValue(windowStart, utcnow)
@@ -120,20 +120,25 @@ func createTimeWindowFilter(config AppConfig, windowStart string, windowEnd stri
 	}
 
 	if windowEnd == "" {
-		windowEnd = readFromUser("window end time (yyyy.MM.dd hh:mm  /  hh:mm  /  n/now):")
+		windowEnd = readFromUser("window end time (yyyy.MM.dd hh:mm(:ss) | hh:mm(:ss) | n/now)>")
 	}
 
 	window.endTimestamp = parseTimestampValue(windowEnd, utcnow)
 
-	if window.endTimestamp != nil &&
-			*window.endTimestamp > utcnow &&
-			windowEnd != "now" {
-		*window.endTimestamp -= ONE_DAY_MILLIS
+	// end window times should finish at the end of the minute/second
+	if window.endTimestamp != nil {
+		// if our time contains seconds, it should be end of the second
+		if *window.endTimestamp % 60000 != 0 {
+			*window.endTimestamp += 1000 - 1
+		} else {
+			*window.endTimestamp += 60000 - 1
+		}
 	}
 
-	// end window times should finish at the end of the minute
-	if window.endTimestamp != nil {
-		*window.endTimestamp += 60000 - 1
+	if window.endTimestamp != nil &&
+		*window.endTimestamp > utcnow &&
+		windowEnd != "now" {
+		*window.endTimestamp -= ONE_DAY_MILLIS
 	}
 
 	// End window times should be after the start times. This can happen if the
@@ -164,32 +169,49 @@ func parseTimestampValue(timeString string, utcnow int64) *int64 {
 		return &utcnow
 	}
 
-
-	if strings.ContainsRune(timeString, ' ') {
-		result := MustParseTime(timeString, "2006.01.02 15:04")
-		return &result
-	}
-
-	result := MustParseTime(timeString, "15:04")
-
-	var dayInfo int64 = 1000 * 3600 * 24
-	result = utcnow - utcnow % dayInfo + result % dayInfo
+	result := MustParseTime(utcnow, timeString)
 
 	return &result
 }
 
-func MustParseTime(timeString, format string) int64 {
-	t, err := time.Parse(format, timeString)
-
-	if err != nil {
-		log.Fatal(fmt.Errorf("unable to parse %s with format %s: %w",
-			timeString,
-			format,
-			err,
-		))
+func MustParseTime(utcnow int64, timeString string) int64 {
+	fullDateTimeLayout := []string{
+		"2006.01.02 15:04",
+		"2006.01.02 15:04:05",
 	}
 
-	return t.UnixMilli()
+	onlyTimeTimeLayout := []string {
+		"15:04",
+		"15:04:05",
+	}
+
+	for _, timeLayout := range fullDateTimeLayout {
+		t, err := time.Parse(timeLayout, timeString);
+
+		if err != nil {
+			continue
+		}
+
+		return t.UnixMilli()
+	}
+
+	for _, timeLayout := range onlyTimeTimeLayout {
+		t, err := time.Parse(timeLayout, timeString);
+
+		if err != nil {
+			continue
+		}
+
+		now := time.UnixMilli(utcnow)
+		r := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), t.Second(), 0, nil)
+
+		result := r.UnixMilli()
+
+		return result
+	}
+
+	log.Fatal(fmt.Errorf("unable to parse time string: %s", timeString))
+	return 0 // => not reached
 }
 
 func readFromUser(label string) string {
