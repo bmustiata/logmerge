@@ -186,7 +186,10 @@ func MustParseTime(utcnow int64, timeString string) int64 {
 	}
 
 	for _, timeLayout := range fullDateTimeLayout {
-		t, err := time.Parse(timeLayout, timeString);
+		// FIXME: make both the local time, and the log time zone configurable, and prefer the
+		//        log timezone. Unless stated, we assume the times in the log are in the local
+		//        timezone.
+		t, err := time.ParseInLocation(timeLayout, timeString, time.Local);
 
 		if err != nil {
 			continue
@@ -196,14 +199,14 @@ func MustParseTime(utcnow int64, timeString string) int64 {
 	}
 
 	for _, timeLayout := range onlyTimeTimeLayout {
-		t, err := time.Parse(timeLayout, timeString);
+		t, err := time.ParseInLocation(timeLayout, timeString, time.Local);
 
 		if err != nil {
 			continue
 		}
 
 		now := time.UnixMilli(utcnow)
-		r := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), t.Second(), 0, nil)
+		r := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.Local)
 
 		result := r.UnixMilli()
 
