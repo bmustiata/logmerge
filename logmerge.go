@@ -19,18 +19,18 @@ type FileLine struct {
 }
 
 type FileRecord struct {
-	timestamp int64
+	timestamp time.Time
 	fileName  string
 	content   string
 }
 
 type FilterTimeWindow struct {
-	startTimestamp *int64
-	endTimestamp *int64
+	startTimestamp *time.Time
+	endTimestamp *time.Time
 }
 
 type TestOnlyFlags struct {
-	currentTime *int64
+	currentTime *time.Time
 }
 
 type AppConfig struct {
@@ -92,7 +92,7 @@ func readApplicationConfig() AppConfig {
 	}
 
 	if testOnlyCurrentTime != "" {
-		fakeCurrentTime := MustParseTime(0, testOnlyCurrentTime)
+		fakeCurrentTime, _ := MustParseTime(time.Now(), testOnlyCurrentTime)
 		result.testOnly.currentTime = &fakeCurrentTime
 	}
 
@@ -106,115 +106,136 @@ func readApplicationConfig() AppConfig {
 func createTimeWindowFilter(config AppConfig, windowStart string, windowEnd string) FilterTimeWindow {
 	window := FilterTimeWindow{}
 	utcnow := GetCurrentTime(config)
+	hasSeconds := false
 
 	if windowStart == "" {
 		windowStart = readFromUser("window start time: yyyy.MM.dd hh:mm(:ss) | hh:mm(:ss) | n/now>")
 	}
 
-	window.startTimestamp = parseTimestampValue(windowStart, utcnow)
+	window.startTimestamp, hasSeconds = parseTimestampValue(windowStart, utcnow)
 
 	if window.startTimestamp != nil &&
-			*window.startTimestamp > utcnow &&
+			window.startTimestamp.After(utcnow) &&
 			windowStart != "now" {
-		*window.startTimestamp -= 3600 * 24
+		*window.startTimestamp = window.startTimestamp.Add(time.Hour * -24)
 	}
 
 	if windowEnd == "" {
 		windowEnd = readFromUser("window end time (yyyy.MM.dd hh:mm(:ss) | hh:mm(:ss) | n/now)>")
 	}
 
-	window.endTimestamp = parseTimestampValue(windowEnd, utcnow)
+	window.endTimestamp, hasSeconds = parseTimestampValue(windowEnd, utcnow)
 
 	// end window times should finish at the end of the minute/second
 	if window.endTimestamp != nil {
 		// if our time contains seconds, it should be end of the second
-		if *window.endTimestamp % 60000 != 0 {
-			*window.endTimestamp += 1000 - 1
+		if hasSeconds {
+			*window.endTimestamp = fillMillisTo999(window.endTimestamp)
 		} else {
-			*window.endTimestamp += 60000 - 1
+			*window.endTimestamp = fillSecMillisTo999(window.endTimestamp)
 		}
 	}
 
 	if window.endTimestamp != nil &&
-		*window.endTimestamp > utcnow &&
+		window.endTimestamp.After(utcnow) &&
 		windowEnd != "now" {
-		*window.endTimestamp -= ONE_DAY_MILLIS
+		*window.endTimestamp = window.endTimestamp.Add(time.Hour * -24)
 	}
 
 	// End window times should be after the start times. This can happen if the
 	// user entered local times and the day changed:
 	// startTimestamp: 23:50, endTimestamp: 01:30
 	if window.endTimestamp != nil && window.startTimestamp != nil &&
-		*window.endTimestamp < *window.startTimestamp {
-		*window.endTimestamp += ONE_DAY_MILLIS
+		window.endTimestamp.Before(*window.startTimestamp) {
+		*window.endTimestamp = window.endTimestamp.Add(time.Hour * 24)
 	}
 
 	return window
 }
 
-func GetCurrentTime(config AppConfig) int64 {
+func fillSecMillisTo999(timestamp *time.Time) time.Time {
+	return time.Date(
+		timestamp.Year(),
+		timestamp.Month(),
+		timestamp.Day(),
+		timestamp.Hour(),
+		timestamp.Minute(),
+		59,
+		int(1 * time.Second - 1 * time.Microsecond),
+		time.Local,
+	)
+}
+
+func fillMillisTo999(timestamp *time.Time) time.Time {
+	return time.Date(
+		timestamp.Year(),
+		timestamp.Month(),
+		timestamp.Day(),
+		timestamp.Hour(),
+		timestamp.Minute(),
+		timestamp.Second(),
+		int(1 * time.Second - 1 * time.Microsecond),
+		time.Local,
+	)
+}
+
+func GetCurrentTime(config AppConfig) time.Time {
 	if config.testOnly.currentTime != nil {
 		return *config.testOnly.currentTime
 	}
 
-	return time.Now().UnixMilli()
+	return time.Now()
 }
 
-func parseTimestampValue(timeString string, utcnow int64) *int64 {
+func parseTimestampValue(timeString string, now time.Time) (*time.Time, bool) {
 	if timeString == "" {
-		return nil
+		return nil, false
 	}
 
 	if timeString == "now" || timeString == "n" {
-		return &utcnow
+		return &now, true
 	}
 
-	result := MustParseTime(utcnow, timeString)
+	result, hasSeconds := MustParseTime(now, timeString)
 
-	return &result
+	return &result, hasSeconds
 }
 
-func MustParseTime(utcnow int64, timeString string) int64 {
-	fullDateTimeLayout := []string{
-		"2006.01.02 15:04",
-		"2006.01.02 15:04:05",
+func MustParseTime(now time.Time, timeString string) (time.Time, bool) {
+	type TimeStruct struct {
+		format string
+		hasSeconds bool
+		hasYear bool
 	}
 
-	onlyTimeTimeLayout := []string {
-		"15:04",
-		"15:04:05",
+	timeLayouts := []TimeStruct{
+		{format: "2006.01.02 15:04", hasSeconds: false, hasYear: true},
+		{format: "2006.01.02 15:04:05", hasSeconds: true, hasYear: true},
+		{format: "15:04", hasSeconds: false},
+		{format: "15:04:05", hasSeconds: true},
 	}
 
-	for _, timeLayout := range fullDateTimeLayout {
+	for _, timeLayout := range timeLayouts {
 		// FIXME: make both the local time, and the log time zone configurable, and prefer the
 		//        log timezone. Unless stated, we assume the times in the log are in the local
 		//        timezone.
-		t, err := time.ParseInLocation(timeLayout, timeString, time.Local);
+		t, err := time.ParseInLocation(timeLayout.format, timeString, time.Local);
 
 		if err != nil {
 			continue
 		}
 
-		return t.UnixMilli()
-	}
-
-	for _, timeLayout := range onlyTimeTimeLayout {
-		t, err := time.ParseInLocation(timeLayout, timeString, time.Local);
-
-		if err != nil {
-			continue
+		if timeLayout.hasYear {
+			return t, timeLayout.hasSeconds
 		}
 
-		now := time.UnixMilli(utcnow)
 		r := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.Local)
 
-		result := r.UnixMilli()
-
-		return result
+		return r, timeLayout.hasSeconds
 	}
 
 	log.Fatal(fmt.Errorf("unable to parse time string: %s", timeString))
-	return 0 // => not reached
+	return time.Time{}, false // => not reached
 }
 
 func readFromUser(label string) string {
@@ -314,7 +335,7 @@ func findNewestRecord(values map[chan FileRecord]FileRecord,
 			return channelIndex[records[i].channel] < channelIndex[records[j].channel]
 		}
 
-		return records[i].record.timestamp < records[j].record.timestamp
+		return records[i].record.timestamp.Before(records[j].record.timestamp)
 	})
 
 	return records[0].record, records[0].channel
@@ -391,7 +412,7 @@ func readMultilineLogEntry(config AppConfig, input chan FileLine) chan FileRecor
 			}
 
 			entry = FileRecord{
-				timestamp: ts,
+				timestamp: *ts,
 				fileName:  line.fileName,
 				content:   line.text,
 			}
@@ -420,7 +441,7 @@ func readMultilineLogEntry(config AppConfig, input chan FileLine) chan FileRecor
 			output <- entry
 
 			entry = FileRecord{
-				timestamp: ts,
+				timestamp: *ts,
 				fileName:  line.fileName,
 				content:   line.text,
 			}
@@ -434,11 +455,11 @@ func readMultilineLogEntry(config AppConfig, input chan FileLine) chan FileRecor
 }
 
 func isRecordValid(config AppConfig, record FileRecord) bool {
-	if config.window.startTimestamp != nil && record.timestamp < *config.window.startTimestamp {
+	if config.window.startTimestamp != nil && record.timestamp.Before(*config.window.startTimestamp) {
 		return false
 	}
 
-	if config.window.endTimestamp != nil && record.timestamp > *config.window.endTimestamp {
+	if config.window.endTimestamp != nil && record.timestamp.After(*config.window.endTimestamp) {
 		return false
 	}
 
@@ -477,28 +498,28 @@ func writeLog(outFileName string, input chan FileRecord) {
 	f.Close()
 }
 
-func isLineNewRecord(line string) (bool, int64) {
+func isLineNewRecord(line string) (bool, *time.Time) {
 	m := FILE_RECORD_RE.FindStringSubmatch(line)
 
 	if m == nil {
-		return false, -1
+		return false, nil
 	}
 
 	timestamp, err := parseTimestamp(m[1])
 
 	if err != nil {
-		return false, -2
+		return false, nil
 	}
 
 	return true, timestamp
 }
 
-func parseTimestamp(stringTimestamp string) (int64, error) {
-	parse, err := time.Parse("20060102/150405.000", stringTimestamp)
+func parseTimestamp(stringTimestamp string) (*time.Time, error) {
+	t, err := time.ParseInLocation("20060102/150405.000", stringTimestamp, time.Local)
 
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
 
-	return parse.UnixMilli(), nil
+	return &t, nil
 }

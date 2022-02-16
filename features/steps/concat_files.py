@@ -104,7 +104,7 @@ def check_tracemix_contains_only_filtered_days(context):
     expected = read_file("features/steps/expected/several_files_day_over_midnight.txt")
     test.assertEquals(
         expected, context.output_file,
-        "The concatenated files had wrong content"
+        "The concatenated files had wrong content: several_files_day_over_midnight.txt"
     )
 
 
@@ -143,7 +143,7 @@ def i_runtracemix_with_absolute_dates(context):
 
 @then("the output file contains only the lines for that one second")
 def check_tracemix_contains_only_filtered_days(context):
-    expected = read_file("features/steps/expected/several_files_day_over_midnight.txt")
+    expected = read_file("features/steps/expected/several_files_single_second.txt")
     test.assertEquals(
         expected, context.output_file,
         "The concatenated files had wrong content"

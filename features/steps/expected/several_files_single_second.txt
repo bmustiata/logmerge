@@ -1,0 +1,10 @@
+file1.txt 20220129/000101.111 - file1 same milli A
+file1.txt 20220129/000101.111 - file1 same milli B
+file1.txt 20220129/000101.111 - file1 same milli C
+file2.txt 20220129/000101.111 - file2 same milli A
+file2.txt 20220129/000101.111 - file2 same milli B
+file2.txt 20220129/000101.111 - file2 same milli C
+multiline.txt 20220129/000101.111 - multiline same milli A
+    same milli
+multiline.txt 20220129/000101.111 - multiline same milli B
+    same milli
