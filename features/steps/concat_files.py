@@ -50,7 +50,7 @@ def i_run_tracemix_to_mix_the_sources(context):
 @then("the output file contains all files concatenated")
 def the_output_file_contains_all_files_concatenated(context):
     expected = read_file("features/steps/expected/several_files_concatenated.txt")
-    test.assertEquals(
+    test.assertEqual(
         expected, context.output_file,
         "The concatenated files had wrong content"
     )
@@ -76,7 +76,7 @@ def i_run_tracemix_same_day(context):
 @then("the output file contains only the lines between 23:40 until 23:50")
 def check_tracemix_contains_only_sameday_lines(context):
     expected = read_file("features/steps/expected/several_files_same_day.txt")
-    test.assertEquals(
+    test.assertEqual(
         expected, context.output_file,
         "The concatenated files had wrong content"
     )
@@ -102,7 +102,7 @@ def i_run_tracemix_day_passes_over(context):
 @then("the output file contains only the lines from the previous day until today")
 def check_tracemix_contains_only_filtered_days(context):
     expected = read_file("features/steps/expected/several_files_day_over_midnight.txt")
-    test.assertEquals(
+    test.assertEqual(
         expected, context.output_file,
         "The concatenated files had wrong content: several_files_day_over_midnight.txt"
     )
@@ -144,7 +144,7 @@ def i_runtracemix_with_absolute_dates(context):
 @then("the output file contains only the lines for that one second")
 def check_tracemix_contains_only_filtered_days(context):
     expected = read_file("features/steps/expected/several_files_single_second.txt")
-    test.assertEquals(
+    test.assertEqual(
         expected, context.output_file,
         "The concatenated files had wrong content"
     )

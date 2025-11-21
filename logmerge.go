@@ -480,7 +480,11 @@ func writeLog(outFileName string, input chan FileRecord) {
 
 	for ok {
 		basePath := path.Base(record.fileName)
-		_, err = r.WriteString(basePath + " " + record.content + "\n")
+		recordLines := strings.Split(record.content, "\n")
+
+		for _, line := range recordLines {
+			_, err = r.WriteString(basePath + " " + line + "\n")
+		}
 
 		if err != nil {
 			log.Fatal(fmt.Errorf("unable to write into outputFileName file %s: %w", outFileName, err))
